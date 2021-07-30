@@ -3,14 +3,15 @@
 
 #include <AzCore/Component/Component.h>
 #include <AzCore/Component/TickBus.h>
+#include <AzCore/RTTI/BehaviorContext.h>
 #include <Javascript/JavascriptBus.h>
+#include <JavascriptContext.h>
 
 namespace Javascript
 {
     class JavascriptSystemComponent
         : public AZ::Component
         , protected JavascriptRequestBus::Handler
-        , public AZ::TickBus::Handler
     {
     public:
         AZ_COMPONENT(JavascriptSystemComponent, "{3900f916-805e-4ac2-b3ec-adf7ad04d26c}");
@@ -38,10 +39,12 @@ namespace Javascript
         void Deactivate() override;
         ////////////////////////////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////////////////////////
-        // AZTickBus interface implementation
-        void OnTick(float deltaTime, AZ::ScriptTimePoint time) override;
-        ////////////////////////////////////////////////////////////////////////
-    };
+        JavascriptContext* GetContext(AZ::EntityId entityId) override;
+        void DestroyContext(AZ::EntityId entityId) override;
 
+        void InitializingJSEnviroment(AZ::BehaviorContext* context);
+        void RegisterClass(const AZStd::pair<AZStd::string, AZ::BehaviorClass*>& klass);
+    private:
+        AZStd::unordered_map<AZ::EntityId, AZStd::shared_ptr<JavascriptContext>> m_contexts;
+    };
 } // namespace Javascript

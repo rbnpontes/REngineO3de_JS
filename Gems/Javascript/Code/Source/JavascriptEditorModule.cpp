@@ -2,6 +2,7 @@
 #include <JavascriptModuleInterface.h>
 #include <JavascriptEditorSystemComponent.h>
 #include <JavascriptComponent.h>
+#include <JavascriptEditorComponent.h>
 
 namespace Javascript
 {
@@ -19,7 +20,7 @@ namespace Javascript
             // This will associate the AzTypeInfo information for the components with the the SerializeContext, BehaviorContext and EditContext.
             // This happens through the [MyComponent]::Reflect() function.
             m_descriptors.insert(m_descriptors.end(), {
-                REngine::JavascriptComponent::CreateDescriptor()
+                JavascriptEditorComponent::CreateDescriptor(),
             });
         }
 
@@ -30,7 +31,7 @@ namespace Javascript
         AZ::ComponentTypeList GetRequiredSystemComponents() const override
         {
             return AZ::ComponentTypeList {
-                azrtti_typeid<REngine::JavascriptComponent>(),
+                azrtti_typeid<JavascriptSystemComponent>(),
             };
         }
     };

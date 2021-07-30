@@ -20,7 +20,7 @@ ly_add_target(
         duktape_lib_files.cmake
     INCLUDE_DIRECTORIES
         INTERFACE
-            ../External/duktape-2.6.0/src
+            ../External/duktape-2.6.0
         PUBLIC_HEADER
             Include
 )

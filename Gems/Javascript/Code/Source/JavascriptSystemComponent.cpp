@@ -12,17 +12,7 @@ namespace Javascript
         if (AZ::SerializeContext* serialize = azrtti_cast<AZ::SerializeContext*>(context))
         {
             serialize->Class<JavascriptSystemComponent, AZ::Component>()
-                ->Version(0)
-                ;
-
-            if (AZ::EditContext* ec = serialize->GetEditContext())
-            {
-                /*ec->Class<JavascriptSystemComponent>("Javascript", "Run Javascript Code")
-                    ->ClassElement(AZ::Edit::ClassElements::EditorData, "")
-                        ->Attribute(AZ::Edit::Attributes::AppearsInAddComponentMenu, AZ_CRC("System"))
-                        ->Attribute(AZ::Edit::Attributes::AutoExpand, true)
-                    ;*/
-            }
+                ->Version(0);
         }
     }
 
@@ -62,22 +52,47 @@ namespace Javascript
 
     void JavascriptSystemComponent::Init()
     {
+        AZ::BehaviorContext* behaviourCtx;
+        AZ::ComponentApplicationBus::BroadcastResult(behaviourCtx, &AZ::ComponentApplicationBus::Events::GetBehaviorContext);
+        InitializingJSEnviroment(behaviourCtx);
     }
 
     void JavascriptSystemComponent::Activate()
     {
         JavascriptRequestBus::Handler::BusConnect();
-        AZ::TickBus::Handler::BusConnect();
+        //AZ::TickBus::Handler::BusConnect();
     }
 
     void JavascriptSystemComponent::Deactivate()
     {
-        AZ::TickBus::Handler::BusDisconnect();
+        //AZ::TickBus::Handler::BusDisconnect();
         JavascriptRequestBus::Handler::BusDisconnect();
     }
 
-    void JavascriptSystemComponent::OnTick([[maybe_unused]] float deltaTime, [[maybe_unused]] AZ::ScriptTimePoint time)
+    void JavascriptSystemComponent::InitializingJSEnviroment(AZ::BehaviorContext* context)
     {
+        for (AZStd::pair<AZStd::string, AZ::BehaviorClass*> klass : context->m_classes)
+            RegisterClass(klass);
     }
 
+    void JavascriptSystemComponent::RegisterClass(const AZStd::pair<AZStd::string, AZ::BehaviorClass*>& klass)
+    {
+        AZ_TracePrintf("JavascriptSystemComponent", "Registering Class: %s \n", klass.first);
+    }
+
+    JavascriptContext* JavascriptSystemComponent::GetContext(AZ::EntityId entityId)
+    {
+        AZStd::shared_ptr<JavascriptContext> ctx = m_contexts[entityId];
+        if (ctx)
+            return ctx.get();
+        ctx = AZStd::shared_ptr<JavascriptContext>(new JavascriptContext());
+        ctx->SetEntity(entityId);
+        m_contexts[entityId] = ctx;
+        return ctx.get();
+    }
+
+    void JavascriptSystemComponent::DestroyContext(AZ::EntityId entityId)
+    {
+        m_contexts[entityId] = nullptr;
+    }
 } // namespace Javascript

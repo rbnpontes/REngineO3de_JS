@@ -2,7 +2,7 @@
 #include <AzCore/Memory/SystemAllocator.h>
 #include <AzCore/Module/Module.h>
 #include <JavascriptSystemComponent.h>
-
+#include <JavascriptComponent.h>
 namespace Javascript
 {
     class JavascriptModuleInterface
@@ -14,13 +14,15 @@ namespace Javascript
 
         JavascriptModuleInterface()
         {
+            AZ_TracePrintf("JavascriptModuleInterface", "Initializing JavascriptModuleInterface");
             // Push results of [MyComponent]::CreateDescriptor() into m_descriptors here.
             // Add ALL components descriptors associated with this gem to m_descriptors.
             // This will associate the AzTypeInfo information for the components with the the SerializeContext, BehaviorContext and EditContext.
             // This happens through the [MyComponent]::Reflect() function.
             m_descriptors.insert(m_descriptors.end(), {
+                JavascriptComponent::CreateDescriptor(),
                 JavascriptSystemComponent::CreateDescriptor(),
-                });
+            });
         }
 
         /**
@@ -28,7 +30,7 @@ namespace Javascript
          */
         AZ::ComponentTypeList GetRequiredSystemComponents() const override
         {
-            return AZ::ComponentTypeList{
+            return AZ::ComponentTypeList {
                 azrtti_typeid<JavascriptSystemComponent>(),
             };
         }
