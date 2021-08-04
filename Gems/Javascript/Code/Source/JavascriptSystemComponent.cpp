@@ -4,6 +4,7 @@
 #include <AzCore/Serialization/SerializeContext.h>
 #include <AzCore/Serialization/EditContext.h>
 #include <AzCore/Serialization/EditContextConstants.inl>
+#include <AzCore/RTTI/BehaviorContext.h>
 
 namespace Javascript
 {
@@ -54,6 +55,7 @@ namespace Javascript
     {
         AZ::BehaviorContext* behaviourCtx;
         AZ::ComponentApplicationBus::BroadcastResult(behaviourCtx, &AZ::ComponentApplicationBus::Events::GetBehaviorContext);
+
         InitializingJSEnviroment(behaviourCtx);
     }
 
@@ -73,11 +75,44 @@ namespace Javascript
     {
         for (AZStd::pair<AZStd::string, AZ::BehaviorClass*> klass : context->m_classes)
             RegisterClass(klass);
+        for (AZStd::pair<AZStd::string, AZ::BehaviorEBus*> ebus : context->m_ebuses)
+            RegisterEBuses(ebus);
     }
 
     void JavascriptSystemComponent::RegisterClass(const AZStd::pair<AZStd::string, AZ::BehaviorClass*>& klass)
     {
         AZ_TracePrintf("JavascriptSystemComponent", "Registering Class: %s \n", klass.first);
+    }
+
+    void JavascriptSystemComponent::RegisterEBuses(const AZStd::pair<AZStd::string, AZ::BehaviorEBus*>& ebus)
+    {
+        /*if (ebus.first == "TickBus") {
+            AZ::BehaviorEBusHandler* handler = 0;
+            AZ::BehaviorValueParameter idParam;
+            idParam.Set(ebus.second->m_idParam);
+
+            if (ebus.second->m_createHandler) {
+                ebus.second->m_createHandler->InvokeResult(handler);
+            }
+
+            if (handler) {
+                const AZ::BehaviorEBusHandler::EventArray& events = handler->GetEvents();
+                for (int iEvent = 0; iEvent < static_cast<int>(events.size()); ++iEvent) {
+                    const AZ::BehaviorEBusHandler::BusForwarderEvent& e = events[iEvent];
+                    AZ::BehaviorEBusHandler::GenericHookType hookFn = [](
+                        void* userData,
+                        const char* eventName,
+                        int eventIndex,
+                        AZ::BehaviorValueParameter* result,
+                        int numParameters,
+                        AZ::BehaviorValueParameter* parameters) {
+                        AZ_Printf("JavascriptSystem", "Hello from Tick");
+                    };
+                    handler->InstallGenericHook(iEvent, hookFn);
+                }
+                handler->Connect(idParam);
+            }
+        }*/
     }
 
     JavascriptContext* JavascriptSystemComponent::GetContext(AZ::EntityId entityId)

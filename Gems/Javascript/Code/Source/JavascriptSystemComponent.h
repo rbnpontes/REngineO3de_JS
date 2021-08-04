@@ -44,6 +44,7 @@ namespace Javascript
 
         void InitializingJSEnviroment(AZ::BehaviorContext* context);
         void RegisterClass(const AZStd::pair<AZStd::string, AZ::BehaviorClass*>& klass);
+        void RegisterEBuses(const AZStd::pair<AZStd::string, AZ::BehaviorEBus*>& ebus);
     private:
         AZStd::unordered_map<AZ::EntityId, AZStd::shared_ptr<JavascriptContext>> m_contexts;
     };
