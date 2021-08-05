@@ -3,6 +3,8 @@
 #include <AzCore/RTTI/AttributeReader.h>
 #include <Utils/JavascriptUtils.h>
 #include <Utils/DuktapeUtils.h>
+#include <JavascriptInstance.h>
+#include <JavascriptProperty.h>
 #include <sstream>
 
 namespace Javascript {
@@ -154,16 +156,6 @@ namespace Javascript {
             duk_push_int(m_context, (int)storageType);
             duk_put_prop_string(m_context, -2, Utils::StorageKey);
         }
-        //{
-        //    // Declare member methods
-        //    duk_push_object(m_context);
-
-        //    for (auto propPair : klass->m_properties) {
-        //        
-        //    }
-
-        //    duk_put_prop_string(m_context, -2, "prototype");
-        //}
 
         duk_put_global_string(m_context, klass->m_name.c_str());
     }
@@ -216,6 +208,7 @@ namespace Javascript {
             return DUK_RET_TYPE_ERROR;
         }
 
+        JavascriptInstance* instance = new JavascriptInstance(klass);
         void* obj = klass->Allocate();
         AZStd::vector<void*> pointers;
         if (AZ::BehaviorMethod* bestCtor = Utils::GetAvailableCtor(klass, args)) {
@@ -288,11 +281,14 @@ namespace Javascript {
         else {
             klass->m_defaultConstructor(obj, klass->m_userData);
         }
+        
+        instance->SetInstance(obj);
+        instance->SetArgValues(pointers);
 
         duk_push_this(ctx);
         {
             // Define Instance pointer
-            duk_push_pointer(ctx, obj);
+            duk_push_pointer(ctx, instance);
             duk_put_prop_string(ctx, -2, Utils::InstanceKey);
         }
 
@@ -305,6 +301,11 @@ namespace Javascript {
             duk_push_object(ctx); // Add property configs
             {
                 for (auto propPair : klass->m_properties) {
+                    if (AZ::FindAttribute(AZ::Script::Attributes::Ignore, propPair.second->m_attributes))
+                        continue;
+                    JavascriptProperty* prop = new JavascriptProperty(instance, propPair.second);
+                    instance->AddProperty(propPair.first, prop);
+
                     duk_push_object(ctx);
                     {
                         // Enumerable property
@@ -319,14 +320,14 @@ namespace Javascript {
                     {
                         // Getter
                         duk_push_c_function(ctx, &JavascriptContext::OnGetter, 1);
-                        duk_push_pointer(ctx, propPair.second); // Store BehaviorProperty inside getter function
+                        duk_push_pointer(ctx, prop); // Store JavascriptProperty inside getter function
                         duk_put_prop_string(ctx, -2, Utils::PropertyKey);
                         duk_put_prop_string(ctx, -2, "get");
                     }
                     {
                         // Setter
                         duk_push_c_function(ctx, &JavascriptContext::OnSetter, 2);
-                        duk_push_pointer(ctx, propPair.second); // Store BehaviorProperty inside setter function
+                        duk_push_pointer(ctx, prop); // Store JavascriptProperty inside setter function
                         duk_put_prop_string(ctx, -2, Utils::PropertyKey);
                         duk_put_prop_string(ctx, -2, "set");
                     }
@@ -344,30 +345,87 @@ namespace Javascript {
     duk_ret_t JavascriptContext::OnGetter(duk_context* ctx)
     {
         const char* key = duk_get_string(ctx, -1);
-        AZ::BehaviorParameter* param = nullptr;
-        AZ::BehaviorClass* klass = nullptr;
+        JavascriptProperty* prop = nullptr;
         {
             duk_push_current_function(ctx);
             duk_get_prop_string(ctx, -1, Utils::PropertyKey);
-            param = Utils::GetPointer<AZ::BehaviorParameter>(ctx, -1);
-            duk_pop(ctx);
-            duk_get_prop_string(ctx, -1, Utils::BehaviorClassKey);
-            klass = Utils::GetPointer<AZ::BehaviorClass>(ctx, -1);
+            prop = Utils::GetPointer<JavascriptProperty>(ctx, -1);
             duk_pop_2(ctx);
         }
 
-        AZ_Assert(param, "BehaviorParameter not found on this object.");
-        AZ_Assert(klass, "BehaviorClass not found on this object.");
-        if (!param || !klass)
+        AZ_Assert(prop, "JavascriptProperty not found on this object.");
+        if (!prop)
             return DUK_RET_ERROR;
 
+        AZ::BehaviorMethod* method = prop->GetProperty()->m_getter;
+        const AZ::BehaviorParameter* resultType = method->GetResult();
 
+        AZ::BehaviorObject obj(prop->GetInstance()->GetInstance(), prop->GetClass()->m_azRtti);
+
+        void* value = Utils::AllocateValue(resultType->m_typeId);
+
+        AZ::BehaviorValueParameter arguments[40];
+        AZ::BehaviorValueParameter result;
+
+        result.Set(*resultType);
+        result.m_value = value;
+
+        arguments[0].Set(&obj);
+        arguments[0].m_traits = AZ::BehaviorParameter::TR_POINTER;
+        arguments[1].Set(*resultType);
+        arguments[1].m_value = value;
+
+        if (!method->Call(arguments, 2, &result)) {
+            AZ_Error("Javascript", false, "Error has ocurred on access property data");
+            return DUK_RET_ERROR;
+        }
+
+        JavascriptVariant var = Utils::ConvertToVariant(value, resultType);
+        Utils::PushValue(ctx, var);
+
+        delete value;
         return 1;
     }
 
     duk_ret_t JavascriptContext::OnSetter(duk_context* ctx)
     {
-        return duk_ret_t();
+        JavascriptVariant var = Utils::GetValue(ctx, 0);
+        const char* key = duk_get_string(ctx, 1);
+        JavascriptProperty* prop = nullptr;
+        {
+            duk_push_current_function(ctx);
+            duk_get_prop_string(ctx, -1, Utils::PropertyKey);
+            prop = Utils::GetPointer<JavascriptProperty>(ctx, -1);
+            duk_pop_2(ctx);
+        }
+
+        AZ_Assert(prop, "JavascriptProperty not found on this object.");
+        if (!prop)
+            return DUK_RET_ERROR;
+
+
+        AZ::BehaviorMethod* method = prop->GetProperty()->m_setter;
+        const AZ::BehaviorParameter* setterType = method->GetArgument(1);
+
+        AZ::BehaviorObject obj(prop->GetInstance()->GetInstance(), prop->GetClass()->m_azRtti);
+
+        void* value = Utils::AllocateValue(var, setterType->m_typeId);
+
+        AZ::BehaviorValueParameter arguments[40];
+        arguments[0].Set(&obj);
+        arguments[0].m_traits = AZ::BehaviorParameter::TR_POINTER;
+        arguments[1].Set(*setterType);
+        arguments[1].m_value = value;
+
+
+        duk_ret_t result = 0;
+        if (!method->Call(arguments, 2)) {
+            AZ_Error("Javascript", false, "Error has ocurred on access property data");
+            result = DUK_RET_ERROR;
+        }
+
+        delete value;
+        return result;
     }
 
     duk_ret_t JavascriptContext::OnCreateEBusHandler(duk_context* ctx)

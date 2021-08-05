@@ -5,6 +5,8 @@ set(FILES
     Include/JavascriptContext.h
     Include/JavascriptVariant.h
     Include/JavascriptTypes.h
+    Include/JavascriptProperty.h
+    Include/JavascriptInstance.h
     Include/Utils/DuktapeUtils.h
     Include/Utils/JavascriptUtils.h
     Source/JavascriptModuleInterface.h
@@ -13,6 +15,8 @@ set(FILES
     Source/JavascriptComponent.cpp
     Source/JavascriptContext.cpp
     Source/JavascriptVariant.cpp
+    Source/JavascriptProperty.cpp
+    Source/JavascriptInstance.cpp
     Source/Utils/DuktapeUtils.cpp
     Source/Utils/JavascriptUtils.cpp
 )

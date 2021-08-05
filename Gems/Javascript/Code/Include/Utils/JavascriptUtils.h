@@ -11,5 +11,8 @@ namespace Javascript {
 
         bool IsMatchMethod(AZ::BehaviorMethod* method, const JavascriptArray& values);
         AZ::BehaviorMethod* GetAvailableCtor(AZ::BehaviorClass* klass, const JavascriptArray& values);
+        JavascriptVariant ConvertToVariant(void* value, const AZ::BehaviorParameter* param);
+        void* AllocateValue(AZ::Uuid typeId);
+        void* AllocateValue(JavascriptVariant value, AZ::Uuid type);
     }
 }

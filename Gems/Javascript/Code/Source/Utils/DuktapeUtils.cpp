@@ -32,6 +32,7 @@ namespace Javascript {
                 break;
             case DUK_TYPE_NUMBER:
                 value = JavascriptVariant(duk_get_number(ctx, idx));
+                break;
             case DUK_TYPE_OBJECT: {
                 if (duk_is_array(ctx, idx))
                     value = JavascriptVariant(GetArray(ctx, idx));

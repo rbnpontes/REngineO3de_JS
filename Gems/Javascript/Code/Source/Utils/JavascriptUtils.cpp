@@ -54,5 +54,110 @@ namespace Javascript {
             }
             return nullptr;
         }
+
+        JavascriptVariant ConvertToVariant(void* value, const AZ::BehaviorParameter* param)
+        {
+            JavascriptVariant result;
+            AZ::Uuid type = param->m_typeId;
+
+            if (type == azrtti_typeid<int>()) {
+                int* val = reinterpret_cast<int*>(value);
+                result.Set(*val);
+            }
+            else if (type == azrtti_typeid<float>()) {
+                float* val = reinterpret_cast<float*>(value);
+                result.Set(*val);
+            }
+            else if (type == azrtti_typeid<double>()) {
+                double* val = reinterpret_cast<double*>(value);
+                result.Set(*val);
+            }
+            else if (type == azrtti_typeid<JavascriptString>()) {
+                JavascriptString* str = static_cast<JavascriptString*>(value);
+                result.Set(str->c_str());
+            }
+            else if (type == azrtti_typeid<const char*>()) {
+                const char* buffer = static_cast<const char*>(value);
+                result.Set(buffer);
+            }
+            else if (type == azrtti_typeid<JavascriptObject>()) {
+                JavascriptObject* obj = static_cast<JavascriptObject*>(value);
+                result.Set(*obj);
+            }
+            else if (type == azrtti_typeid<JavascriptArray>()) {
+                JavascriptArray* arr = static_cast<JavascriptArray*>(value);
+                result.Set(*arr);
+            }
+            else {
+                result.Set(value);
+            }
+
+            return result;
+        }
+
+        void* AllocateValue(AZ::Uuid typeId)
+        {
+            if (typeId == azrtti_typeid<int>())
+                return new int();
+            else if (typeId == azrtti_typeid<float>())
+                return new float();
+            else if (typeId == azrtti_typeid<double>())
+                return new double();
+            else if (typeId == azrtti_typeid<JavascriptString>())
+                return new JavascriptString();
+            else if (typeId == azrtti_typeid<bool>())
+                return new bool();
+            return nullptr;
+        }
+        void* AllocateValue(JavascriptVariant value, AZ::Uuid type)
+        {
+            void* ptr = nullptr;
+            switch (value.GetType()) {
+            case JavascriptVariantType::Array: {
+                JavascriptArray* arr = new JavascriptArray(value.GetArray().begin(), value.GetArray().end());
+                ptr = arr;
+            }
+                break;
+            case JavascriptVariantType::Number: {
+                if (type == azrtti_typeid<int>()) {
+                    int* val = new int();
+                    *val = value.GetNumber();
+                    ptr = val;
+                }
+                else if (type == azrtti_typeid<float>()) {
+                    float* val = new float();
+                    *val = value.GetNumber();
+                    ptr = val;
+                }
+                else if (type == azrtti_typeid<double>()) {
+                    double* val = new double();
+                    *val = value.GetNumber();
+                    ptr = val;
+                }
+            }
+                break;
+            case JavascriptVariantType::Object: {
+                JavascriptObject* obj = new JavascriptObject(value.GetObject().begin(), value.GetObject().end());
+                ptr = obj;
+            }
+                break;
+            case JavascriptVariantType::Boolean: {
+                bool* val = new bool();
+                *val = value.GetBoolean();
+                ptr = val;
+            }
+                break;
+            case JavascriptVariantType::String: {
+                JavascriptString* str = new JavascriptString(value.GetString().begin(), value.GetString().end());
+                ptr = str;
+            }
+                break;
+            case JavascriptVariantType::Pointer:
+                ptr = value.GetPointer();
+                break;
+            }
+
+            return ptr;
+        }
     }
 }
