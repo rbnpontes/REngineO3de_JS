@@ -74,7 +74,7 @@ namespace Javascript {
             }
             else if (type == azrtti_typeid<JavascriptString>()) {
                 JavascriptString* str = static_cast<JavascriptString*>(value);
-                result.Set(str->c_str());
+                result.Set(JavascriptString(str->begin(), str->end()));
             }
             else if (type == azrtti_typeid<const char*>()) {
                 const char* buffer = static_cast<const char*>(value);
@@ -82,11 +82,11 @@ namespace Javascript {
             }
             else if (type == azrtti_typeid<JavascriptObject>()) {
                 JavascriptObject* obj = static_cast<JavascriptObject*>(value);
-                result.Set(*obj);
+                result.Set(JavascriptObject(obj->begin(), obj->end()));
             }
             else if (type == azrtti_typeid<JavascriptArray>()) {
                 JavascriptArray* arr = static_cast<JavascriptArray*>(value);
-                result.Set(*arr);
+                result.Set(JavascriptArray(arr->begin(), arr->end()));
             }
             else {
                 result.Set(value);
@@ -158,6 +158,13 @@ namespace Javascript {
             }
 
             return ptr;
+        }
+
+        void ToCamelCase(JavascriptString& value)
+        {
+            if (value.size() < 1)
+                return;
+            value[0] = tolower(value[0]);
         }
     }
 }

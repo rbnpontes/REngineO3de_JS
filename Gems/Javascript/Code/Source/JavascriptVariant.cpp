@@ -1,4 +1,5 @@
 #include <JavascriptVariant.h>
+#include <JavascriptTypes.h>
 
 namespace Javascript {
     JavascriptVariant::JavascriptVariant() {
@@ -68,13 +69,13 @@ namespace Javascript {
     void JavascriptVariant::Set(AZStd::string value)
     {
         m_type = JavascriptVariantType::String;
-        m_value.m_string = value;
+        m_value.m_string = JavascriptString(value);
     }
 
     void JavascriptVariant::Set(AZStd::vector<JavascriptVariant> value)
     {
         m_type = JavascriptVariantType::Array;
-        m_value.m_array = value;
+        m_value.m_array = JavascriptArray(value);
     }
 
     void JavascriptVariant::Set(void* value)
@@ -86,7 +87,7 @@ namespace Javascript {
     void JavascriptVariant::Set(AZStd::unordered_map<AZStd::string, JavascriptVariant> value)
     {
         m_type = JavascriptVariantType::Object;
-        m_value.m_object = value;
+        m_value.m_object = JavascriptObject(value);
     }
 
     int JavascriptVariant::GetInt()
@@ -157,16 +158,16 @@ namespace Javascript {
             m_value.m_bool = value.m_value.m_bool;
             break;
         case Javascript::JavascriptVariantType::String:
-            m_value.m_string = value.m_value.m_string;
+            m_value.m_string = JavascriptString(value.m_value.m_string);
             break;
         case Javascript::JavascriptVariantType::Pointer:
             m_value.m_pointer = value.m_value.m_pointer;
             break;
         case Javascript::JavascriptVariantType::Array:
-            m_value.m_array = value.m_value.m_array;
+            m_value.m_array = JavascriptArray(value.m_value.m_array);
             break;
         case JavascriptVariantType::Object:
-            m_value.m_object = value.m_value.m_object;
+            m_value.m_object = JavascriptObject(value.m_value.m_object);
             break;
         }
 

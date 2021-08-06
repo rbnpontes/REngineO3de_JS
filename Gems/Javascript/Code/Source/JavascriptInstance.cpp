@@ -22,4 +22,11 @@ namespace Javascript {
     {
         return m_properties[key];
     }
+
+    JavascriptMethod* JavascriptInstance::CreateMethod(JavascriptString name, AZ::BehaviorMethod* method)
+    {
+        JavascriptMethod* jsMethod = new JavascriptMethod(this, method);
+        m_methods[name] = AZStd::shared_ptr<JavascriptMethod>(jsMethod);
+        return jsMethod;
+    }
 }

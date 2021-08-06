@@ -5,6 +5,8 @@
 #include <Utils/DuktapeUtils.h>
 #include <JavascriptInstance.h>
 #include <JavascriptProperty.h>
+#include <JavascriptMethod.h>
+#include <JavascriptStackValues.h>
 #include <sstream>
 
 namespace Javascript {
@@ -339,6 +341,29 @@ namespace Javascript {
             duk_pop_2(ctx);
         }
 
+        {
+            // Declare Methods
+            for (auto methodPair : klass->m_methods) {
+                if (AZ::FindAttribute(AZ::Script::Attributes::Ignore, methodPair.second->m_attributes))
+                    continue;
+                JavascriptString methodName = methodPair.first;
+                Utils::ToCamelCase(methodName);
+
+                size_t argsCount = methodPair.second->GetNumArguments();
+                if (methodPair.second->GetNumArguments() >= 1) {
+                    const AZ::BehaviorParameter* param = methodPair.second->GetArgument(0);
+                    // If is a member function reduce args
+                    if (param->m_typeId == klass->m_typeId && (param->m_traits & AZ::BehaviorParameter::TR_POINTER || param->m_traits & AZ::BehaviorParameter::TR_REFERENCE))
+                        argsCount--;
+                }
+
+                duk_push_c_function(ctx, &JavascriptContext::OnMemberFunction, argsCount);
+                duk_push_pointer(ctx, instance->CreateMethod(methodName, methodPair.second));
+                duk_put_prop_string(ctx, -2, Utils::MethodKey);
+                duk_put_prop_string(ctx, -2, methodName.c_str());
+            }
+        }
+
         return 0;
     }
 
@@ -426,6 +451,66 @@ namespace Javascript {
 
         delete value;
         return result;
+    }
+
+    duk_ret_t JavascriptContext::OnMemberFunction(duk_context* ctx)
+    {
+        JavascriptMethod* jsMethod = nullptr;
+        {
+            duk_push_current_function(ctx);
+            duk_get_prop_string(ctx, -1, Utils::MethodKey);
+            jsMethod = Utils::GetPointer<JavascriptMethod>(ctx, -1);
+            duk_pop_2(ctx);
+        }
+
+        AZ_Assert(jsMethod, "JavascriptMethod not found, this object is invalid!");
+        if (!jsMethod)
+            return DUK_RET_ERROR;
+
+        JavascriptArray args = Utils::GetArguments(ctx);
+        AZ::BehaviorMethod* method = jsMethod->GetMethod();
+
+        AZ::BehaviorValueParameter result;
+        if (method->HasResult())
+            result.Set(*method->GetResult());
+
+        JavascriptStackValue values;
+
+        AZ::BehaviorValueParameter arguments[40];
+        for (unsigned i = 0; i < method->GetNumArguments(); ++i) {
+            const AZ::BehaviorParameter* param = method->GetArgument(i);
+            arguments[i].Set(*param);
+            // if first arg is equals to class type
+            // and traits is equal to pointer or reference
+            // and index is zero, then first arg is *this pointer
+            if (i == 0 && param->m_typeId == jsMethod->GetClass()->m_typeId && (param->m_traits & AZ::BehaviorParameter::TR_REFERENCE || param->m_traits & AZ::BehaviorParameter::TR_POINTER)) {
+                arguments[i].m_value = jsMethod->GetInstance()->GetInstance(); // Set current instance
+                arguments[i].m_traits = AZ::BehaviorParameter::TR_POINTER; // I don't know why i need this, but in LUA i found this way and is works, WHATEVER!!!
+                continue;
+            }
+            arguments[i].m_value = values.FromVariant(args.at(i - 1), param->m_typeId);
+        }
+
+        if (method->HasResult()) {
+            // Normally last value is the result
+            void* value = values.FromType(method->GetResult()->m_typeId);
+            // I don't know why i need to copy value pointer into result
+            // But into my tests it's necessary
+            result.m_value = value;
+        }
+
+        duk_ret_t returnResult = method->HasResult() ? 1 : 0;
+        if (!method->Call(arguments, method->GetNumArguments(), method->HasResult() ? &result : nullptr)) {
+            AZ_Error("Javascript", false, "Internal error has ocurred after running this method");
+            returnResult = DUK_RET_ERROR;
+        }
+        else if(method->HasResult()){
+            void* value = values.Get(values.Size() - 1);
+            JavascriptVariant var = Utils::ConvertToVariant(value, method->GetResult());
+            Utils::PushValue(ctx, var);
+        }
+
+        return returnResult;
     }
 
     duk_ret_t JavascriptContext::OnCreateEBusHandler(duk_context* ctx)

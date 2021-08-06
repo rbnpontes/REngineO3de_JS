@@ -1,6 +1,7 @@
 #pragma once
 #include <JavascriptTypes.h>
 #include <JavascriptProperty.h>
+#include <JavascriptMethod.h>
 namespace Javascript {
     class JavascriptInstance {
     public:
@@ -9,6 +10,9 @@ namespace Javascript {
         AZ::BehaviorClass* GetClass() { return m_class; }
         void AddProperty(AZStd::string key, JavascriptProperty* prop);
         AZStd::shared_ptr<JavascriptProperty> GetProperty(AZStd::string key);
+
+        JavascriptMethod* CreateMethod(JavascriptString name, AZ::BehaviorMethod* method);
+
         void* GetInstance() { return m_instance; }
         void SetInstance(void* instance) { m_instance = instance; }
         void SetArgValues(AZStd::vector<void*> args) {
@@ -19,5 +23,6 @@ namespace Javascript {
         AZ::BehaviorClass* m_class;
         AZStd::vector<void*> m_argValues;
         AZStd::unordered_map<AZStd::string, AZStd::shared_ptr<JavascriptProperty>> m_properties;
+        AZStd::unordered_map<AZStd::string, AZStd::shared_ptr<JavascriptMethod>> m_methods;
     };
 }

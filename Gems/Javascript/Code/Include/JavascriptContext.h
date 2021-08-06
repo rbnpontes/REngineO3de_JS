@@ -38,6 +38,7 @@ namespace Javascript {
         static duk_ret_t OnCreateClass(duk_context* ctx);
         static duk_ret_t OnGetter(duk_context* ctx);
         static duk_ret_t OnSetter(duk_context* ctx);
+        static duk_ret_t OnMemberFunction(duk_context* ctx);
         static duk_ret_t OnCreateEBusHandler(duk_context* ctx);
         static duk_ret_t OnSetEBusEvent(duk_context* ctx);
         static duk_ret_t OnConnectEBus(duk_context* ctx);
