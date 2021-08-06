@@ -5,6 +5,7 @@
 #include <AzCore/RTTI/BehaviorContext.h>
 namespace Javascript {
     typedef duk_c_function JavascriptFunction;
+    class JavascriptInstance;
     class JavascriptContext {
     public:
         struct JavascriptEventDesc {
@@ -36,6 +37,7 @@ namespace Javascript {
         void RegisterClass(AZ::BehaviorClass* klass);
         static void DeclareEBusHandler(duk_context* ctx);
         static duk_ret_t OnCreateClass(duk_context* ctx);
+        static duk_ret_t OnCreateClassFromPointer(duk_context* ctx);
         static duk_ret_t OnGetter(duk_context* ctx);
         static duk_ret_t OnSetter(duk_context* ctx);
         static duk_ret_t OnMemberFunction(duk_context* ctx);
@@ -47,6 +49,7 @@ namespace Javascript {
         static duk_ret_t OnCheckBusConnected(duk_context* ctx);
         static duk_ret_t OnLogMethod(duk_context* ctx);
         static JavascriptContext* GetCurrentContext(duk_context* ctx);
+        static duk_ret_t DefineClass(duk_context* ctx, JavascriptInstance* instance, bool isCtorCall);
         static void SetGlobalEBusListener(duk_context* ctx, const char* id, duk_idx_t stackIdx);
         static int GetEBusHandlerEventIndex(AZ::BehaviorEBusHandler* handler, const char* evtName);
         static void HandleEBusGenericHook(

@@ -13,14 +13,16 @@ namespace Javascript {
             delete ptr;
     }
 
-    void JavascriptInstance::AddProperty(AZStd::string key, JavascriptProperty* prop)
-    {
-        m_properties[key] = AZStd::shared_ptr<JavascriptProperty>(prop);
-    }
-
     AZStd::shared_ptr<JavascriptProperty> JavascriptInstance::GetProperty(AZStd::string key)
     {
         return m_properties[key];
+    }
+
+    JavascriptProperty* JavascriptInstance::CreateProperty(JavascriptString name, AZ::BehaviorProperty* prop)
+    {
+        JavascriptProperty* property = new JavascriptProperty(this, prop);
+        m_properties[name] = AZStd::shared_ptr<JavascriptProperty>(property);
+        return property;
     }
 
     JavascriptMethod* JavascriptInstance::CreateMethod(JavascriptString name, AZ::BehaviorMethod* method)

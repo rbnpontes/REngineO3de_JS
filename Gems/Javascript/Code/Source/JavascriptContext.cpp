@@ -159,6 +159,11 @@ namespace Javascript {
             duk_put_prop_string(m_context, -2, Utils::StorageKey);
         }
 
+        {
+            duk_push_c_function(m_context, &JavascriptContext::OnCreateClassFromPointer, 1);
+            duk_put_prop_string(m_context, -2, "fromPointer");
+        }
+
         duk_put_global_string(m_context, klass->m_name.c_str());
     }
 
@@ -287,84 +292,16 @@ namespace Javascript {
         instance->SetInstance(obj);
         instance->SetArgValues(pointers);
 
-        duk_push_this(ctx);
-        {
-            // Define Instance pointer
-            duk_push_pointer(ctx, instance);
-            duk_put_prop_string(ctx, -2, Utils::InstanceKey);
-        }
+        return DefineClass(ctx, instance, true);
+    }
 
-        {
-            // Define Accessors
-            duk_get_global_string(ctx, "Object");
-            duk_get_prop_string(ctx, -1, "defineProperties");
-            // Add current instance as arg
-            duk_push_this(ctx);
-            duk_push_object(ctx); // Add property configs
-            {
-                for (auto propPair : klass->m_properties) {
-                    if (AZ::FindAttribute(AZ::Script::Attributes::Ignore, propPair.second->m_attributes))
-                        continue;
-                    JavascriptProperty* prop = new JavascriptProperty(instance, propPair.second);
-                    instance->AddProperty(propPair.first, prop);
-
-                    duk_push_object(ctx);
-                    {
-                        // Enumerable property
-                        duk_push_boolean(ctx, true);
-                        duk_put_prop_string(ctx, -2, "enumerable");
-                    }
-                    {
-                        // Configurable property
-                        duk_push_boolean(ctx, true);
-                        duk_put_prop_string(ctx, -2, "configurable");
-                    }
-                    {
-                        // Getter
-                        duk_push_c_function(ctx, &JavascriptContext::OnGetter, 1);
-                        duk_push_pointer(ctx, prop); // Store JavascriptProperty inside getter function
-                        duk_put_prop_string(ctx, -2, Utils::PropertyKey);
-                        duk_put_prop_string(ctx, -2, "get");
-                    }
-                    {
-                        // Setter
-                        duk_push_c_function(ctx, &JavascriptContext::OnSetter, 2);
-                        duk_push_pointer(ctx, prop); // Store JavascriptProperty inside setter function
-                        duk_put_prop_string(ctx, -2, Utils::PropertyKey);
-                        duk_put_prop_string(ctx, -2, "set");
-                    }
-
-                    duk_put_prop_string(ctx, -2, propPair.first.c_str());
-                }
-            }
-            duk_call(ctx, 2);
-            duk_pop_2(ctx);
-        }
-
-        {
-            // Declare Methods
-            for (auto methodPair : klass->m_methods) {
-                if (AZ::FindAttribute(AZ::Script::Attributes::Ignore, methodPair.second->m_attributes))
-                    continue;
-                JavascriptString methodName = methodPair.first;
-                Utils::ToCamelCase(methodName);
-
-                size_t argsCount = methodPair.second->GetNumArguments();
-                if (methodPair.second->GetNumArguments() >= 1) {
-                    const AZ::BehaviorParameter* param = methodPair.second->GetArgument(0);
-                    // If is a member function reduce args
-                    if (param->m_typeId == klass->m_typeId && (param->m_traits & AZ::BehaviorParameter::TR_POINTER || param->m_traits & AZ::BehaviorParameter::TR_REFERENCE))
-                        argsCount--;
-                }
-
-                duk_push_c_function(ctx, &JavascriptContext::OnMemberFunction, argsCount);
-                duk_push_pointer(ctx, instance->CreateMethod(methodName, methodPair.second));
-                duk_put_prop_string(ctx, -2, Utils::MethodKey);
-                duk_put_prop_string(ctx, -2, methodName.c_str());
-            }
-        }
-
-        return 0;
+    duk_ret_t JavascriptContext::OnCreateClassFromPointer(duk_context* ctx)
+    {
+        JavascriptInstance* instance = Utils::GetPointer<JavascriptInstance>(ctx, -1);
+        AZ_Assert(instance, "JavascriptInstance is not found");
+        if (instance)
+            return DUK_RET_ERROR;
+        return DefineClass(ctx, instance, false);
     }
 
     duk_ret_t JavascriptContext::OnGetter(duk_context* ctx)
@@ -676,6 +613,93 @@ namespace Javascript {
         JavascriptContext* javascriptCtx = static_cast<JavascriptContext*>(duk_get_pointer(ctx, -1));
         duk_pop(ctx);
         return javascriptCtx;
+    }
+
+    duk_ret_t JavascriptContext::DefineClass(duk_context* ctx, JavascriptInstance* instance, bool isCtorCall)
+    {
+        AZ::BehaviorClass* klass = instance->GetClass();
+        if (isCtorCall)
+            duk_push_this(ctx);
+        else
+            duk_push_object(ctx);
+
+        {
+            // Define Instance Pointer
+            duk_push_pointer(ctx, instance);
+            duk_put_prop_string(ctx, -2, Utils::InstanceKey);
+        }
+
+        {   // Define accessors
+            
+            duk_get_global_string(ctx, "Object");
+            duk_get_prop_string(ctx, -1, "defineProperties");
+            // Add current instance as argument
+            duk_dup(ctx, -3);
+            duk_push_object(ctx); // Add property configs
+            {
+                for (auto propPair : klass->m_properties) {
+                    if (AZ::FindAttribute(AZ::Script::Attributes::Ignore, propPair.second->m_attributes))
+                        continue;
+                    JavascriptString key = propPair.first;
+                    Utils::ToCamelCase(key);
+                    JavascriptProperty* prop = instance->CreateProperty(key, propPair.second);
+
+                    duk_push_object(ctx);
+                    {
+                        // Enumerable property
+                        duk_push_boolean(ctx, true);
+                        duk_put_prop_string(ctx, -2, "enumerable");
+                    }
+                    {
+                        // Configurable property
+                        duk_push_boolean(ctx, true);
+                        duk_put_prop_string(ctx, -2, "configurable");
+                    }
+                    {
+                        // Getter
+                        duk_push_c_function(ctx, &JavascriptContext::OnGetter, 1);
+                        duk_push_pointer(ctx, prop); // Store JavascriptProperty inside getter function
+                        duk_put_prop_string(ctx, -2, Utils::PropertyKey);
+                        duk_put_prop_string(ctx, -2, "get");
+                    }
+                    {
+                        // Setter
+                        duk_push_c_function(ctx, &JavascriptContext::OnSetter, 2);
+                        duk_push_pointer(ctx, prop); // Store JavascriptProperty inside setter function
+                        duk_put_prop_string(ctx, -2, Utils::PropertyKey);
+                        duk_put_prop_string(ctx, -2, "set");
+                    }
+
+                    duk_put_prop_string(ctx, -2, key.c_str());
+                }
+            }
+            duk_call(ctx, 2);
+            duk_pop_2(ctx);
+        }
+
+        {
+            // Declare Methods
+            for (auto methodPair : klass->m_methods) {
+                if (AZ::FindAttribute(AZ::Script::Attributes::Ignore, methodPair.second->m_attributes) || !Utils::IsMemberMethod(methodPair.second, klass))
+                    continue;
+                JavascriptString methodName = methodPair.first;
+                Utils::ToCamelCase(methodName);
+
+                size_t argsCount = methodPair.second->GetNumArguments();
+                if (methodPair.second->GetNumArguments() >= 1) {
+                    const AZ::BehaviorParameter* param = methodPair.second->GetArgument(0);
+                    // If is a member function reduce args
+                    if (param->m_typeId == klass->m_typeId && (param->m_traits & AZ::BehaviorParameter::TR_POINTER || param->m_traits & AZ::BehaviorParameter::TR_REFERENCE))
+                        argsCount--;
+                }
+
+                duk_push_c_function(ctx, &JavascriptContext::OnMemberFunction, argsCount);
+                duk_push_pointer(ctx, instance->CreateMethod(methodName, methodPair.second));
+                duk_put_prop_string(ctx, -2, Utils::MethodKey);
+                duk_put_prop_string(ctx, -2, methodName.c_str());
+            }
+        }
+        return isCtorCall ? 0 : 1;
     }
 
     void JavascriptContext::SetGlobalEBusListener(duk_context* ctx, const char* id, duk_idx_t stackIdx)

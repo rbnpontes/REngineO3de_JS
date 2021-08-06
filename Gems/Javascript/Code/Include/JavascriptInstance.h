@@ -8,9 +8,9 @@ namespace Javascript {
         JavascriptInstance(AZ::BehaviorClass* klass);
         ~JavascriptInstance();
         AZ::BehaviorClass* GetClass() { return m_class; }
-        void AddProperty(AZStd::string key, JavascriptProperty* prop);
         AZStd::shared_ptr<JavascriptProperty> GetProperty(AZStd::string key);
 
+        JavascriptProperty* CreateProperty(JavascriptString name, AZ::BehaviorProperty* prop);
         JavascriptMethod* CreateMethod(JavascriptString name, AZ::BehaviorMethod* method);
 
         void* GetInstance() { return m_instance; }

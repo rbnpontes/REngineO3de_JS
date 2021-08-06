@@ -2,6 +2,18 @@
 
 namespace Javascript {
     namespace Utils {
+        bool IsMemberMethod(AZ::BehaviorMethod* method, AZ::BehaviorClass* klass)
+        {
+            if (method->GetNumArguments() < 1)
+                return false;
+            const AZ::BehaviorParameter* param = method->GetArgument(0);
+            if (param->m_typeId != klass->m_typeId)
+                return false;
+            if (AZ::FindAttribute(AZ::Script::Attributes::Operator, method->m_attributes) && (param->m_traits & AZ::BehaviorParameter::TR_REFERENCE))
+                return true;
+            return param->m_traits & AZ::BehaviorParameter::TR_POINTER && param->m_traits & AZ::BehaviorParameter::TR_THIS_PTR;
+        }
+
         bool IsMatchMethod(AZ::BehaviorMethod* method, const JavascriptArray& values)
         {
             // First of all, check if method args match total of incoming arg types
