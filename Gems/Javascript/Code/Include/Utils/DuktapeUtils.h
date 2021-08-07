@@ -17,5 +17,6 @@ namespace Javascript {
         void PushObject(duk_context* ctx, const JavascriptObject& map);
         JavascriptObject GetObject(duk_context* ctx, duk_idx_t idx);
         AZ::Script::Attributes::StorageType GetStorageType(duk_context* ctx, duk_idx_t idx);
+        void SetFinalizer(duk_context* ctx, duk_idx_t targetIdx, duk_c_function finalizerFn);
     }
 }

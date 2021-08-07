@@ -11,8 +11,8 @@ namespace Javascript {
         inline const char* MethodKey = DUK_HIDDEN_SYMBOL("__method");
 
         bool IsMemberMethod(AZ::BehaviorMethod* method, AZ::BehaviorClass* klass);
-
         bool IsMatchMethod(AZ::BehaviorMethod* method, const JavascriptArray& values);
+        bool IsNativeObject(AZ::Uuid type);
         AZ::BehaviorMethod* GetAvailableCtor(AZ::BehaviorClass* klass, const JavascriptArray& values);
         JavascriptVariant ConvertToVariant(void* value, const AZ::BehaviorParameter* param);
         void* AllocateValue(AZ::Uuid typeId);

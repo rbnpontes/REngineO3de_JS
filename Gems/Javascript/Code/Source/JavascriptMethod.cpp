@@ -27,4 +27,27 @@ namespace Javascript {
 
         return false;
     }
+
+    JavascriptMethodStatic::JavascriptMethodStatic(JavascriptString name, AZ::BehaviorClass* klass, AZ::BehaviorMethod* method) :
+        m_name(name),
+        m_class(klass),
+        m_method(method)
+    {
+    }
+
+    AZ::BehaviorClass* JavascriptMethodStatic::GetClass()
+    {
+        return m_class;
+    }
+
+    AZ::BehaviorMethod* JavascriptMethodStatic::GetMethod()
+    {
+        return m_method;
+    }
+
+    bool JavascriptMethodStatic::Call(duk_context* ctx, const JavascriptArray& args)
+    {
+        return false;
+    }
+
 }

@@ -135,5 +135,18 @@ namespace Javascript {
             duk_pop(ctx);
             return type;
         }
+
+        void SetFinalizer(duk_context* ctx, duk_idx_t targetIdx, duk_c_function finalizerFn)
+        {
+            duk_idx_t mainIdx = duk_get_top_index(ctx);
+            duk_dup(ctx, targetIdx);
+            duk_get_global_string(ctx, "Duktape");
+            duk_get_prop_string(ctx, -1, "fin");
+            duk_dup(ctx, -3);
+            duk_push_c_function(ctx, finalizerFn, 2);
+            duk_call(ctx, 2);
+            while (duk_get_top_index(ctx) > mainIdx)
+                duk_pop(ctx);
+        }
     }
 }

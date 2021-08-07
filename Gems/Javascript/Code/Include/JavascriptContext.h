@@ -3,6 +3,7 @@
 #include <AzCore/std/string/string.h>
 #include <AzCore/Component/Entity.h>
 #include <AzCore/RTTI/BehaviorContext.h>
+#include <JavascriptMethod.h>
 namespace Javascript {
     typedef duk_c_function JavascriptFunction;
     class JavascriptInstance;
@@ -41,6 +42,7 @@ namespace Javascript {
         static duk_ret_t OnGetter(duk_context* ctx);
         static duk_ret_t OnSetter(duk_context* ctx);
         static duk_ret_t OnMemberFunction(duk_context* ctx);
+        static duk_ret_t OnFunction(duk_context* ctx);
         static duk_ret_t OnCreateEBusHandler(duk_context* ctx);
         static duk_ret_t OnSetEBusEvent(duk_context* ctx);
         static duk_ret_t OnConnectEBus(duk_context* ctx);
@@ -60,10 +62,12 @@ namespace Javascript {
             int numParameters,
             AZ::BehaviorValueParameter* parameters
         );
+        static duk_ret_t HandleObjectFinalization(duk_context* ctx);
         static AZStd::string GetEventId(const char* eventName, AZ::BehaviorEBus* ebus);
-
+        static bool CreateFromPointer(duk_context* ctx, const JavascriptString& className, AZ::BehaviorClass* klass, void* instance);
         duk_context* m_context;
         AZStd::unordered_map<AZStd::string, AZStd::shared_ptr<JavascriptEventDesc>> m_events;
+        AZStd::vector<AZStd::shared_ptr<JavascriptMethodStatic>> m_staticMethods;
         AZ::BehaviorContext* m_behaviorContext;
     };
 }

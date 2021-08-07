@@ -58,6 +58,23 @@ namespace Javascript {
             return true;
         }
 
+        bool IsNativeObject(AZ::Uuid type)
+        {
+            return !(
+                type == azrtti_typeid<int32_t>()
+                || type == azrtti_typeid<uint32_t>()
+                || type == azrtti_typeid<int64_t>()
+                || type == azrtti_typeid<uint64_t>()
+                || type == azrtti_typeid<float_t>()
+                || type == azrtti_typeid<double_t>()
+                || type == azrtti_typeid<bool>()
+                || type == azrtti_typeid<const char*>()
+                || type == azrtti_typeid<JavascriptString>()
+                || type == azrtti_typeid<JavascriptArray>()
+                || type == azrtti_typeid<JavascriptObject>()
+                );
+        }
+
         AZ::BehaviorMethod* GetAvailableCtor(AZ::BehaviorClass* klass, const JavascriptArray& values)
         {
             for (AZ::BehaviorMethod* method : klass->m_constructors) {

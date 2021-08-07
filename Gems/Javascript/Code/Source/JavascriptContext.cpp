@@ -5,7 +5,6 @@
 #include <Utils/DuktapeUtils.h>
 #include <JavascriptInstance.h>
 #include <JavascriptProperty.h>
-#include <JavascriptMethod.h>
 #include <JavascriptStackValues.h>
 #include <sstream>
 
@@ -99,7 +98,10 @@ namespace Javascript {
         for (auto classPair : classes) {
             AZ::BehaviorClass* klass = classPair.second;
             className = klass->m_name;
-            if (className.contains("VM") || className.contains("Iterator") || className.contains("String") || className.contains("EBusHandlerw"))
+            if (className.contains("VM")
+                || className.contains("Iterator")
+                || className.contains("String") || className.contains("basic_string")
+                || className.contains("EBusHandler"))
                 continue;
 
             RegisterClass(klass);
@@ -160,8 +162,24 @@ namespace Javascript {
         }
 
         {
+            // Define static methods
             duk_push_c_function(m_context, &JavascriptContext::OnCreateClassFromPointer, 1);
             duk_put_prop_string(m_context, -2, "fromPointer");
+
+            for (auto methodPair : klass->m_methods) {
+                if (AZ::FindAttribute(AZ::Script::Attributes::Ignore, methodPair.second->m_attributes) || Utils::IsMemberMethod(methodPair.second, klass))
+                    continue;
+                JavascriptString methodName = methodPair.first;
+                Utils::ToCamelCase(methodName);
+
+                AZStd::shared_ptr<JavascriptMethodStatic> method(new JavascriptMethodStatic(methodName, klass, methodPair.second));
+                m_staticMethods.push_back(method);
+
+                duk_push_c_function(m_context, &JavascriptContext::OnFunction, methodPair.second->GetNumArguments());
+                duk_push_pointer(m_context, method.get());
+                duk_put_prop_string(m_context, -2, Utils::MethodKey);
+                duk_put_prop_string(m_context, -2, methodName.c_str());
+            }
         }
 
         duk_put_global_string(m_context, klass->m_name.c_str());
@@ -299,7 +317,7 @@ namespace Javascript {
     {
         JavascriptInstance* instance = Utils::GetPointer<JavascriptInstance>(ctx, -1);
         AZ_Assert(instance, "JavascriptInstance is not found");
-        if (instance)
+        if (!instance)
             return DUK_RET_ERROR;
         return DefineClass(ctx, instance, false);
     }
@@ -447,6 +465,59 @@ namespace Javascript {
             Utils::PushValue(ctx, var);
         }
 
+        return returnResult;
+    }
+
+    duk_ret_t JavascriptContext::OnFunction(duk_context* ctx)
+    {
+        JavascriptMethodStatic* jsMethod = nullptr;
+        {
+            duk_push_current_function(ctx);
+            duk_get_prop_string(ctx, -1, Utils::MethodKey);
+            jsMethod = Utils::GetPointer<JavascriptMethodStatic>(ctx, -1);
+            duk_pop_2(ctx);
+        }
+        AZ_Assert(jsMethod, "JavascriptMethodStatic not found, this object is invalid!");
+        if (!jsMethod)
+            return DUK_RET_ERROR;
+        JavascriptArray args = Utils::GetArguments(ctx);
+        AZ::BehaviorMethod* method = jsMethod->GetMethod();
+
+        AZ::BehaviorValueParameter result;
+        if (method->HasResult())
+            result.Set(*method->GetResult());
+
+        JavascriptStackValue values;
+
+        AZ::BehaviorValueParameter arguments[40];
+        for (unsigned i = 0; i < method->GetNumArguments(); ++i) {
+            const AZ::BehaviorParameter* param = method->GetArgument(i);
+            arguments[i].Set(*param);
+            arguments[i].m_value = values.FromVariant(args.at(i), param->m_typeId);
+        }
+
+        if (method->HasResult()) {
+            void* value = values.FromType(method->GetResult()->m_typeId);
+            result.m_value = value;
+        }
+
+        duk_ret_t returnResult = method->HasResult() ? 1 : 0;
+        if (!method->Call(arguments, method->GetNumArguments(), method->HasResult() ? &result : nullptr)) {
+            AZ_Error("Javascript", false, "Internal error has ocurred after running this method");
+            returnResult = DUK_RET_ERROR;
+        }
+        else if (method->HasResult()) {
+            void* value = values.Get(values.Size() - 1);
+            if (Utils::IsNativeObject(method->GetResult()->m_typeId)) {
+                values.Detach(values.Size() - 1); // Ignore deallocation from result item
+                CreateFromPointer(ctx, jsMethod->GetName(), jsMethod->GetClass(), value);
+            }
+            else{
+                JavascriptVariant var = Utils::ConvertToVariant(value, method->GetResult());
+                Utils::PushValue(ctx, var);
+            }
+        }
+        
         return returnResult;
     }
 
@@ -685,19 +756,18 @@ namespace Javascript {
                 JavascriptString methodName = methodPair.first;
                 Utils::ToCamelCase(methodName);
 
-                size_t argsCount = methodPair.second->GetNumArguments();
-                if (methodPair.second->GetNumArguments() >= 1) {
-                    const AZ::BehaviorParameter* param = methodPair.second->GetArgument(0);
-                    // If is a member function reduce args
-                    if (param->m_typeId == klass->m_typeId && (param->m_traits & AZ::BehaviorParameter::TR_POINTER || param->m_traits & AZ::BehaviorParameter::TR_REFERENCE))
-                        argsCount--;
-                }
+                size_t argsCount = methodPair.second->GetNumArguments() - 1;
 
                 duk_push_c_function(ctx, &JavascriptContext::OnMemberFunction, argsCount);
                 duk_push_pointer(ctx, instance->CreateMethod(methodName, methodPair.second));
                 duk_put_prop_string(ctx, -2, Utils::MethodKey);
                 duk_put_prop_string(ctx, -2, methodName.c_str());
             }
+        }
+
+        {
+            // Set Finalizer
+            Utils::SetFinalizer(ctx, -1, &JavascriptContext::HandleObjectFinalization);
         }
         return isCtorCall ? 0 : 1;
     }
@@ -748,11 +818,47 @@ namespace Javascript {
         duk_pop_2(ctx);
     }
 
+    duk_ret_t JavascriptContext::HandleObjectFinalization(duk_context* ctx)
+    {
+        duk_get_prop_string(ctx, 0, Utils::InstanceKey);
+        if (duk_is_null_or_undefined(ctx, -1))
+            return 0;
+        JavascriptInstance* instance = static_cast<JavascriptInstance*>(duk_get_pointer(ctx, -1));
+        if (!instance)
+            return 0;
+        delete instance;
+        return 0;
+    }
+
     AZStd::string JavascriptContext::GetEventId(const char* eventName, AZ::BehaviorEBus* ebus)
     {
         AZStd::string evtId = ebus->m_name;
         evtId.append("_");
         evtId.append(eventName);
         return evtId;
+    }
+
+    bool JavascriptContext::CreateFromPointer(duk_context* ctx, const JavascriptString& className, AZ::BehaviorClass* klass, void* instance)
+    {
+        if (!instance) {
+            duk_push_null(ctx);
+            return false;
+        }
+        duk_get_global_string(ctx, klass->m_name.c_str());
+        if (duk_is_null_or_undefined(ctx, -1)) {
+            duk_push_null(ctx);
+            return false;
+        }
+        duk_get_prop_string(ctx, -1, "fromPointer");
+        if (duk_is_null_or_undefined(ctx, -1)) {
+            duk_push_null(ctx);
+            return false;
+        }
+        JavascriptInstance* instanceObj = new JavascriptInstance(klass);
+        instanceObj->SetInstance(instance);
+
+        duk_push_pointer(ctx, instanceObj);
+        duk_call(ctx, 1);
+        return true;
     }
 }

@@ -1,4 +1,5 @@
 #include <JavascriptStackValues.h>
+#include <JavascriptInstance.h>
 
 namespace Javascript {
     JavascriptStackValue::~JavascriptStackValue()
@@ -121,8 +122,10 @@ namespace Javascript {
         case JavascriptVariantType::String:
             return AllocateString(variant.GetString());
             break;
-        case JavascriptVariantType::Pointer:
-            return AllocatePointer(variant.GetPointer());
+        case JavascriptVariantType::Pointer: {
+            JavascriptInstance* instance = static_cast<JavascriptInstance*>(variant.GetPointer());
+            return AllocatePointer(instance->GetInstance());
+        }
             break;
         }
         return nullptr;
@@ -151,10 +154,18 @@ namespace Javascript {
         return AllocatePointer();
     }
 
+    void JavascriptStackValue::Detach(unsigned idx)
+    {
+        if(idx < m_values.size())
+            m_values[idx] = nullptr;
+    }
+
     void JavascriptStackValue::Clean()
     {
-        for (void* ptr : m_values)
-            delete ptr;
+        for (void* ptr : m_values) {
+            if(ptr)
+                delete ptr;
+        }
         m_values.clear();
     }
 

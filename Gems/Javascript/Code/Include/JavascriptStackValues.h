@@ -24,6 +24,13 @@ namespace Javascript {
         void* FromVariant(JavascriptVariant variant, AZ::Uuid auxiliarType);
         void* FromType(AZ::Uuid type);
         void* Get(unsigned idx) { return m_values.at(idx); }
+        /// <summary>
+        /// This method will mark on values list item as nullptr
+        /// On this way, when clean method is called this item will
+        /// be ignored
+        /// </summary>
+        /// <param name="idx"></param>
+        void Detach(unsigned idx);
 
         void Clean();
         unsigned Size() { return m_values.size(); }
